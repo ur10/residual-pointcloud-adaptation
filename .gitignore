@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+runs/
+checkpoints/
+data/
+wandb/
+*.ckpt
+*.pt

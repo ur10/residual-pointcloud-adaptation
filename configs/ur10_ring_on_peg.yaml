@@ -1,0 +1,46 @@
+# Ring-on-peg insertion on a UR10 with a Robotiq 2F gripper.
+# Observations are point clouds fused from two RealSense cameras.
+
+task:
+  name: ring_on_peg
+  control_hz: 10
+  max_steps: 300
+  success_depth: 0.015        # ring seated this far down the peg, metres
+
+observation:
+  cameras: [front, right]
+  workspace_bounds:            # metres, robot base frame
+    lower: [-0.35, -0.55, 0.00]
+    upper: [ 0.35,  0.10, 0.45]
+  num_points: 1024
+  depth_trunc: 1.2
+  voxel_size: 0.004
+  remove_outliers: true
+
+base_policy:
+  checkpoint: checkpoints/dp3_ring_on_peg.ckpt
+  action_dim: 7                # 6-DoF end-effector delta + gripper
+  frozen: true
+
+residual:
+  hidden_sizes: [256, 256]
+  max_delta:                   # hard clip on the correction, per channel
+    translation: 0.005         # metres per control step
+    rotation: 0.02             # radians per control step
+    gripper: 0.0               # residual does not touch the gripper
+  gate:
+    type: q_advantage
+    threshold: 0.0
+    temperature: 0.05
+    min_open_steps: 3
+
+train:
+  algo: sac
+  steps: 50000
+  batch_size: 256
+  lr: 3.0e-4
+  gamma: 0.97
+  tau: 0.005
+  warmup_steps: 1000
+  buffer_capacity: 200000
+  seed: 0
