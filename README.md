@@ -44,6 +44,7 @@ residual_adapt/train/buffer.py          replay over real transitions
 residual_adapt/envs/ur10_ring_on_peg.py one interface, sim and hardware backends
 scripts/train_residual.py               training entry point
 scripts/eval_policy.py                  paired base-vs-adapted rollouts
+tests/test_obs_and_bounds.py            geometry and safety-bound tests
 ```
 
 The observation pipeline is worth a look even in isolation: fusing both camera
@@ -70,7 +71,13 @@ Video of the base and adapted policies on the real UR10 is on the project page:
 ```sh
 pip install -r requirements.txt
 python scripts/train_residual.py --config configs/ur10_ring_on_peg.yaml
+python -m pytest tests/ -q
 ```
+
+The tests cover the parts that need neither a robot nor a checkpoint, including
+the two properties the safety argument rests on: that the residual's output
+stays inside `max_delta` for arbitrary inputs, and that the gate holds its state
+for `min_open_steps` before closing.
 
 ## License
 
