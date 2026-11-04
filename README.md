@@ -52,19 +52,6 @@ views, cropping to the workspace, dropping the speckle that depth holes leave
 around the peg, and farthest-point sampling so the ring and peg survive
 resampling instead of being swamped by the table.
 
-## Status
-
-**Scaffold, under active development.** The architecture, the bounded-residual
-formulation, the gate and the SAC update are implemented. What is not here:
-trained checkpoints, the lab's controller and camera drivers (the hardware
-backend names the calls it needs and raises rather than pretending), and
-quantitative results. The entry-point scripts stop at the point where an
-environment must be attached and say so explicitly.
-
-Nothing in this repository should be read as a reported result.
-
-Video of the base and adapted policies on the real UR10 is on the project page:
-<https://ur10.github.io>
 
 ## Running
 
