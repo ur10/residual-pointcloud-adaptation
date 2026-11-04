@@ -52,6 +52,12 @@ views, cropping to the workspace, dropping the speckle that depth holes leave
 around the peg, and farthest-point sampling so the ring and peg survive
 resampling instead of being swamped by the table.
 
+## Status
+
+Trained checkpoints are coming soon. The method itself is here: the observation
+pipeline, the bounded residual, the gate and the SAC update. Videos of the base
+and adapted policies on the real UR10 are on the
+[project page](https://ur10.github.io/#p-manip).
 
 ## Running
 
