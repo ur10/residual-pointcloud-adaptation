@@ -1,76 +1,79 @@
-# Adapting Point-Cloud Policies to Real-World Manipulation
+# Fine-Grained Point-Cloud Manipulation with Residual RL
 
-Point-cloud manipulation policies trained in simulation transfer poorly to real
-robots, where depth observations contain missing points, occlusions and
-calibration error. This repository adapts a **pretrained 3D policy without
-changing the base model**, by learning a small residual policy on top of it with
-off-policy reinforcement learning, and gating when that residual is allowed to
-act.
+This repository studies how a pretrained **point-cloud behavior cloning (BC) policy** can be adapted for fine-grained manipulation using **residual reinforcement learning**. The base policy provides a 3D manipulation prior, while a separate residual policy learns small, closed-loop action corrections. The pretrained policy remains frozen throughout residual training.
 
-The task used throughout is ring-on-peg insertion on a UR10 with a Robotiq 2F
-gripper, observed by two RealSense cameras.
+The central idea is to preserve the geometric generalization of a 3D policy while improving control during alignment and contact.
 
-## Why a residual, and why a gate
+## Why Point Clouds?
 
-Fine-tuning the base policy on the small amount of real interaction that is
-practical to collect destroys the geometry prior that made it generalize in the
-first place. So the base policy is **frozen** and treated as a fixed function of
-the observation.
+Manipulation depends on spatial relationships between the robot, the object, and the target. A point cloud directly represents observed surfaces in 3D, making it useful for reasoning about relative pose, clearance, and approach direction.
 
-An unconstrained residual, though, is just a second policy: wherever the reward
-is ambiguous it drifts the behaviour away from the base policy. Two things keep
-that in check.
+Our base policy follows a **DP3-style point-cloud diffusion policy**. Compared with using RGB images alone, its 3D input exposes metric geometry that is useful when objects are repositioned or approached from different directions. The residual policy builds on this geometric prior rather than retraining it.
 
-- **The correction is bounded by construction.** The residual actor's output is
-  squashed through `tanh` and scaled by `max_delta`, so a single control step
-  cannot move the end effector further than a configured distance. The bound is
-  not a penalty term that training can trade away.
-- **A gate decides when it applies at all.** The gate opens only when the critic
-  prefers the corrected action to the base action, with hysteresis so it does
-  not stutter at the control rate. When it is closed, the robot executes exactly
-  the base policy, which makes the adapted policy a strict superset of the
-  behaviour validated in simulation.
+## Manipulation Scenes
 
-## Layout
+The project focuses on tasks where a good approach trajectory must be followed by precise alignment or contact-aware control.
 
-```
-residual_adapt/obs/pointcloud.py        depth -> fused, cropped, FPS-sampled cloud
-residual_adapt/policies/base.py         frozen pretrained policy wrapper
-residual_adapt/policies/residual.py     squashed-Gaussian residual + composed policy
-residual_adapt/policies/gate.py         advantage gate with hysteresis
-residual_adapt/policies/critic.py       twin Q, shared by the update and the gate
-residual_adapt/train/sac.py             SAC over the residual, base held fixed
-residual_adapt/train/buffer.py          replay over real transitions
-residual_adapt/envs/ur10_ring_on_peg.py one interface, sim and hardware backends
-scripts/train_residual.py               training entry point
-scripts/eval_policy.py                  paired base-vs-adapted rollouts
-tests/test_obs_and_bounds.py            geometry and safety-bound tests
+| Scene | Manipulation objective | Role in the experiments |
+| --- | --- | --- |
+| **RoboMimic Square** | Grasp a square nut and place it onto a peg | Precision alignment and insertion |
+| **Adroit Pen** | Reorient and manipulate a pen with a dexterous hand | Fine-grained corrections during contact and reorientation |
+| **Adroit Door** | Manipulate a door handle and open the door | Evaluate whether residual control preserves a strong base behavior |
+| **UR10 ring-on-peg** | Align and insert a ring onto a peg using a UR10 and Robotiq 2F gripper | Real-robot manipulation setup using two RealSense cameras |
+
+## Policy Architecture
+
+The policy has two action pathways:
+
+1. **Frozen point-cloud BC:** a pretrained 3D diffusion policy produces the base action, `a_base`, from the point-cloud observation and robot state.
+2. **Residual RL:** a separate actor produces a small action correction, `delta_a`, using additional observations. The residual is trained with off-policy reinforcement learning while the BC policy remains fixed.
+
+The executed action is
+
+```text
+a_exec = a_base + gate * delta_a
 ```
 
-The observation pipeline is worth a look even in isolation: fusing both camera
-views, cropping to the workspace, dropping the speckle that depth holes leave
-around the peg, and farthest-point sampling so the ring and peg survive
-resampling instead of being swamped by the table.
+The residual actor uses a squashed action distribution, and `max_delta` scales the correction. A critic-based gate compares the corrected action against the base action and uses hysteresis to avoid rapid switching. When the gate is closed, the controller executes the base action without a residual correction.
 
-## Status
+The residual pathway can use robot state, RGB observations, or point-cloud features. This lets us study which observations help most during fine-grained manipulation while keeping the base policy unchanged.
 
-Trained checkpoints are coming soon. The method itself is here: the observation
-pipeline, the bounded residual, the gate and the SAC update. Videos of the base
-and adapted policies on the real UR10 are on the
-[project page](https://ur10.github.io/#p-manip).
+## Point-Cloud Observation Pipeline
+
+For the UR10 scene, the depth-processing pipeline:
+
+- Fuses observations from two RealSense cameras.
+- Transforms the points into a common frame and crops them to the manipulation workspace.
+- Filters isolated depth points and artifacts around the ring and peg.
+- Uses farthest-point sampling (FPS) to form a fixed-size input cloud for the policy.
+
+The observation pipeline and policy are separated so the same residual-learning structure can be used across simulation and robot scenes.
+
+## Repository Structure
+
+```text
+residual_adapt/obs/pointcloud.py         depth to fused, cropped, sampled point cloud
+residual_adapt/policies/base.py          frozen pretrained BC policy wrapper
+residual_adapt/policies/residual.py      residual actor and composed policy
+residual_adapt/policies/gate.py          critic-based gate with hysteresis
+residual_adapt/policies/critic.py        twin Q-functions
+residual_adapt/train/sac.py              off-policy residual SAC update
+residual_adapt/train/buffer.py           transition replay buffer
+residual_adapt/envs/ur10_ring_on_peg.py  simulation and hardware environment interface
+scripts/train_residual.py                training entry point
+scripts/eval_policy.py                   base and residual policy evaluation
+tests/test_obs_and_bounds.py             observation and action-bound tests
+```
 
 ## Running
 
-```sh
+```bash
 pip install -r requirements.txt
 python scripts/train_residual.py --config configs/ur10_ring_on_peg.yaml
 python -m pytest tests/ -q
 ```
 
-The tests cover the parts that need neither a robot nor a checkpoint, including
-the two properties the safety argument rests on: that the residual's output
-stays inside `max_delta` for arbitrary inputs, and that the gate holds its state
-for `min_open_steps` before closing.
+Project videos and additional context are available on the [project page](https://ur10.github.io/#p-manip).
 
 ## License
 
