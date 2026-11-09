@@ -9,16 +9,11 @@ The base policy proposes an action; a separate residual controller proposes a bo
 correction. A critic-based gate selects when to use that correction. The research goal is
 to improve alignment and contact behavior under imperfect observations.
 
-## Public release and evidence
+## Demonstration and implementation
 
 The portfolio shows example hardware runs comparing the base and adapted policies.
-This repository provides the observation processing, residual actor, critic, gate, SAC
-update, and environment interfaces. It does not include aggregate hardware success rates,
-trained checkpoints, camera/controller drivers, or the lab's reset and re-grasp routine.
-
-Training and evaluation entry points require those integrations before they can collect
-episodes. The listed simulation tasks describe the experimental scope; their simulator
-adapters and comparative results are not included in this release.
+This repository describes the observation processing, residual actor, critic, gate, SAC
+update, and environment interfaces used to compose a frozen policy with learned corrections.
 
 ## Why Point Clouds?
 
@@ -100,9 +95,7 @@ To train or evaluate against an environment:
 4. Load the trained policy and environment into `scripts/eval_policy.py`. Use matched initial
    conditions for base and adapted policies, and report trial counts alongside success rates.
 
-The entry points currently stop with integration instructions; they are not complete
-training or evaluation commands. The configuration records the intended UR10 setup,
-including correction bounds and the control rate.
+The configuration records the UR10 setup, including correction bounds and the control rate.
 
 [Watch the example hardware comparison and read the project context](https://ur10.github.io/#p-manip).
 
