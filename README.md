@@ -1,8 +1,24 @@
 # Fine-Grained Point-Cloud Manipulation with Residual RL
 
-This repository studies how a pretrained **point-cloud behavior cloning (BC) policy** can be adapted for fine-grained manipulation using **residual reinforcement learning**. The base policy provides a 3D manipulation prior, while a separate residual policy learns small, closed-loop action corrections. The pretrained policy remains frozen throughout residual training.
+A manipulation policy can bring an object close to its target yet struggle with the final
+alignment. This project studies whether small learned corrections can adapt a pretrained
+point-cloud policy for precise manipulation while keeping its existing behavior fixed.
+The physical demonstration is ring-on-peg insertion with a UR10 and two RealSense cameras.
 
-The central idea is to preserve the geometric generalization of a 3D policy while improving control during alignment and contact.
+The base policy proposes an action; a separate residual controller proposes a bounded
+correction. A critic-based gate selects when to use that correction. The research goal is
+to improve alignment and contact behavior under imperfect observations.
+
+## Public release and evidence
+
+The portfolio shows example hardware runs comparing the base and adapted policies.
+This repository provides the observation processing, residual actor, critic, gate, SAC
+update, and environment interfaces. It does not include aggregate hardware success rates,
+trained checkpoints, camera/controller drivers, or the lab's reset and re-grasp routine.
+
+Training and evaluation entry points require those integrations before they can collect
+episodes. The listed simulation tasks describe the experimental scope; their simulator
+adapters and comparative results are not included in this release.
 
 ## Why Point Clouds?
 
@@ -65,15 +81,30 @@ scripts/eval_policy.py                   base and residual policy evaluation
 tests/test_obs_and_bounds.py             observation and action-bound tests
 ```
 
-## Running
+## Setup and integration
+
+Install the dependencies and run the component tests from the repository root:
 
 ```bash
 pip install -r requirements.txt
-python scripts/train_residual.py --config configs/ur10_ring_on_peg.yaml
 python -m pytest tests/ -q
 ```
 
-Project videos and additional context are available on the [project page](https://ur10.github.io/#p-manip).
+To train or evaluate against an environment:
+
+1. Supply a compatible pretrained checkpoint and adapt `FrozenBasePolicy._load` to its format.
+2. Connect the simulator or the camera, controller, and pose-tracker interfaces. For hardware,
+   implement the reset and re-grasp routine in `RealUR10.reset`.
+3. Complete episode collection in `scripts/train_residual.py` and connect observations to the
+   residual input representation.
+4. Load the trained policy and environment into `scripts/eval_policy.py`. Use matched initial
+   conditions for base and adapted policies, and report trial counts alongside success rates.
+
+The entry points currently stop with integration instructions; they are not complete
+training or evaluation commands. The configuration records the intended UR10 setup,
+including correction bounds and the control rate.
+
+[Watch the example hardware comparison and read the project context](https://ur10.github.io/#p-manip).
 
 ## License
 
